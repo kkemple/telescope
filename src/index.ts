@@ -1,7 +1,13 @@
 import './env';
 import 'isomorphic-fetch';
 import { ApolloClient, HttpLink, InMemoryCache, gql } from '@apollo/client';
-// import { startOfMonth, format, parse } from 'date-fns';
+import {
+  // startOfMonth,
+  // format,
+  // parse,
+  formatDistance,
+  parseISO,
+} from 'date-fns';
 
 type GitHubResponse = any;
 
@@ -41,16 +47,12 @@ const QUERY = gql`
           filterBy: { since: $activeSince }
         ) {
           nodes {
-            createdAt
             updatedAt
             url
             title
             bodyText
-            assignees(last: 10) {
-              nodes {
-                login
-                url
-              }
+            reactions {
+              totalCount
             }
             comments {
               totalCount
@@ -63,14 +65,9 @@ const QUERY = gql`
           filterBy: { assignee: null }
         ) {
           nodes {
-            createdAt
-            updatedAt
             title
             bodyText
             url
-            assignees {
-              totalCount
-            }
           }
         }
       }
@@ -88,6 +85,32 @@ const client = new ApolloClient({
   }),
 });
 
+const generateTopTenStaleIssuesText = (staleIssues: any) => {
+  return staleIssues.nodes.reduce((mem: string, val: any) => {
+    const titleWithLink = `[${val.title}](${val.url})`;
+    const truncatedBody = `${val.bodyText.substr(0, 140)}...`;
+
+    return `${mem}\n...\n${titleWithLink}\n${truncatedBody}`;
+  }, '');
+};
+
+const generateTopTenActiveIssuesText = (activeIssues: any) => {
+  return activeIssues.nodes.reduce((mem: string, val: any) => {
+    const titleWithLink = `[${val.title}](${val.url})`;
+    const truncatedBody = `${val.bodyText.substr(0, 140)}...`;
+    const updatedAt = `${formatDistance(parseISO(val.updatedAt), new Date())}`;
+    const totalCommentCount = val.comments.totalCount
+      ? val.comments.totalCount
+      : 'no';
+    const totalReactionCount = val.comments.totalCount
+      ? val.comments.totalCount
+      : 'no';
+    const details = `There are ${totalCommentCount} comments on this issue, and it has ${totalReactionCount} reactions. It was last updated ${updatedAt} ago.`;
+
+    return `${mem}\n...\n${titleWithLink}\n${details}\n${truncatedBody}`;
+  }, '');
+};
+
 async function main(): Promise<void> {
   try {
     const {
@@ -95,7 +118,26 @@ async function main(): Promise<void> {
         organization: { repository },
       },
     }: GitHubResponse = await client.query({ query: QUERY });
-    console.log(JSON.stringify(repository.topTenActiveIssues, null, 2));
+
+    /**
+     * Avg time since last interaction on issue
+     * Avg time to respond to issues
+     * Avg time to close issues
+     * Number of open PRs
+     * Avg time to merge PRs
+     * Avg time to review PRs
+     * Avg time between review and merge
+     */
+
+    // const numberOfOpenIssues: number = repository.openIssuesForStats.totalCount;
+
+    const topTenStaleIssues: string = generateTopTenStaleIssuesText(
+      repository.topTenStaleIssues
+    );
+    const topTenActiveIssues: string = generateTopTenActiveIssuesText(
+      repository.topTenActiveIssues
+    );
+    console.log(topTenActiveIssues, topTenStaleIssues);
   } catch (error) {
     console.log(error);
     process.exit(1);
