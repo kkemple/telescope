@@ -87,7 +87,7 @@ const client = new ApolloClient({
 
 const generateTopTenStaleIssuesText = (staleIssues: any) => {
   return staleIssues.nodes.reduce((mem: string, val: any) => {
-    const titleWithLink = `[${val.title}](${val.url})`;
+    const titleWithLink = `*${val.title}*\n${val.url}`;
     const truncatedBody = `${val.bodyText.substr(0, 140)}...`;
 
     return `${mem}\n...\n${titleWithLink}\n${truncatedBody}`;
@@ -96,7 +96,7 @@ const generateTopTenStaleIssuesText = (staleIssues: any) => {
 
 const generateTopTenActiveIssuesText = (activeIssues: any) => {
   return activeIssues.nodes.reduce((mem: string, val: any) => {
-    const titleWithLink = `[${val.title}](${val.url})`;
+    const titleWithLink = `*${val.title}*\n${val.url}`;
     const truncatedBody = `${val.bodyText.substr(0, 140)}...`;
     const updatedAt = `${formatDistance(parseISO(val.updatedAt), new Date())}`;
     const totalCommentCount = val.comments.totalCount
