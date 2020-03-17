@@ -9,7 +9,128 @@ type GitHubResponse = any;
 const QUERY = gql`
   query GitHubData($activeSince: String) {
     organization(login: "apollographql") {
-      repository(name: "apollo-tooling") {
+      apolloTooling: repository(name: "apollo-tooling") {
+        name
+        openIssuesForStats: issues(last: 100, states: OPEN) {
+          totalCount
+          nodes {
+            createdAt
+            updatedAt
+            url
+            assignees {
+              totalCount
+            }
+            comments(first: 100) {
+              totalCount
+              nodes {
+                createdAt
+              }
+            }
+          }
+        }
+        closedIssuesForStats: issues(last: 100, states: CLOSED) {
+          nodes {
+            createdAt
+            closedAt
+            comments(first: 1) {
+              nodes {
+                createdAt
+              }
+            }
+          }
+        }
+        topTenActiveIssues: issues(
+          last: 10
+          states: OPEN
+          filterBy: { since: $activeSince }
+        ) {
+          nodes {
+            updatedAt
+            url
+            title
+            bodyText
+            reactions {
+              totalCount
+            }
+            comments {
+              totalCount
+            }
+          }
+        }
+        topTenStaleIssues: issues(
+          first: 10
+          states: OPEN
+          filterBy: { assignee: null }
+        ) {
+          nodes {
+            title
+            bodyText
+            url
+          }
+        }
+      }
+      apolloClient: repository(name: "apollo-client") {
+        name
+        openIssuesForStats: issues(last: 100, states: OPEN) {
+          totalCount
+          nodes {
+            createdAt
+            updatedAt
+            url
+            assignees {
+              totalCount
+            }
+            comments(first: 100) {
+              totalCount
+              nodes {
+                createdAt
+              }
+            }
+          }
+        }
+        closedIssuesForStats: issues(last: 100, states: CLOSED) {
+          nodes {
+            createdAt
+            closedAt
+            comments(first: 1) {
+              nodes {
+                createdAt
+              }
+            }
+          }
+        }
+        topTenActiveIssues: issues(
+          last: 10
+          states: OPEN
+          filterBy: { since: $activeSince }
+        ) {
+          nodes {
+            updatedAt
+            url
+            title
+            bodyText
+            reactions {
+              totalCount
+            }
+            comments {
+              totalCount
+            }
+          }
+        }
+        topTenStaleIssues: issues(
+          first: 10
+          states: OPEN
+          filterBy: { assignee: null }
+        ) {
+          nodes {
+            title
+            bodyText
+            url
+          }
+        }
+      }
+      apolloServer: repository(name: "apollo-server") {
+        name
         openIssuesForStats: issues(last: 100, states: OPEN) {
           totalCount
           nodes {
@@ -197,50 +318,33 @@ const generateAvgTimeToRespondToIssuesText = (openIssues: any) => {
   } issues out of the last 100 that have not been responded to.`;
 };
 
-async function main(): Promise<void> {
-  try {
-    const {
-      data: {
-        organization: { repository },
-      },
-    }: GitHubResponse = await client.query({ query: QUERY });
+const generateReportForRepository = (repository: any): string => {
+  const numberOfOpenIssues: string = `There are ${repository.openIssuesForStats.totalCount} open issues currently.`;
 
-    /**
-     * Number of open PRs
-     * Avg time to merge PRs
-     * Avg time to review PRs
-     * Avg time between review and merge
-     */
+  const avgTimeToCloseIssues: string = generateAvgTimeToCloseIssuesText(
+    repository.closedIssuesForStats
+  );
 
-    const numberOfOpenIssues: string = `There are ${repository.openIssuesForStats.totalCount} open issues currently.`;
+  const avgTimeToRespondToIssues: string = generateAvgTimeToRespondToIssuesText(
+    repository.openIssuesForStats
+  );
 
-    const avgTimeToCloseIssues: string = generateAvgTimeToCloseIssuesText(
-      repository.closedIssuesForStats
-    );
+  const avgTimeSinceLastUpdate: string = generateAvgTimeSinceLastUpdateText(
+    repository.openIssuesForStats
+  );
 
-    const avgTimeToRespondToIssues: string = generateAvgTimeToRespondToIssuesText(
-      repository.openIssuesForStats
-    );
+  const topTenStaleIssues: string = generateTopTenStaleIssuesText(
+    repository.topTenStaleIssues
+  );
 
-    const avgTimeSinceLastUpdate: string = generateAvgTimeSinceLastUpdateText(
-      repository.openIssuesForStats
-    );
+  const topTenActiveIssues: string = generateTopTenActiveIssuesText(
+    repository.topTenActiveIssues
+  );
 
-    const topTenStaleIssues: string = generateTopTenStaleIssuesText(
-      repository.topTenStaleIssues
-    );
+  const title = `## ${repository.name}`;
 
-    const topTenActiveIssues: string = generateTopTenActiveIssuesText(
-      repository.topTenActiveIssues
-    );
-
-    const title = `Repo Metrics for \`apollo-tooling\` - ${format(
-      new Date(),
-      'MMMM do, yyyy'
-    )}`;
-
-    const report: string = `
-## ${title}
+  const report: string = `
+${title}
 
 - ${numberOfOpenIssues}
 - ${avgTimeToRespondToIssues}
@@ -252,10 +356,47 @@ ${topTenActiveIssues}
 ${topTenStaleIssues}
 `;
 
+  return report;
+};
+
+async function main(): Promise<void> {
+  try {
+    const {
+      data: {
+        organization: { apolloTooling, apolloClient, apolloServer },
+      },
+    }: GitHubResponse = await client.query({ query: QUERY });
+
+    /**
+     * Number of open PRs
+     * Avg time to merge PRs
+     * Avg time to review PRs
+     * Avg time between review and merge
+     */
+
+    const reportTitle = `Health Report for Apollo OSS Repositories - ${format(
+      new Date(),
+      'MMMM do, yyyy'
+    )}`;
+
+    const toolingReport = generateReportForRepository(apolloTooling);
+    const clientReport = generateReportForRepository(apolloClient);
+    const serverReport = generateReportForRepository(apolloServer);
+
+    const aggregatedReport = `
+# ${reportTitle}
+
+${clientReport}
+
+${serverReport}
+
+${toolingReport}
+`;
+
     if (process.env.ZAPIER_WEBHOOK_URL) {
       fetch(process.env.ZAPIER_WEBHOOK_URL, {
         method: 'POST',
-        body: JSON.stringify({ title, report }),
+        body: JSON.stringify({ title: reportTitle, report: aggregatedReport }),
       });
     }
   } catch (error) {
