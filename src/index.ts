@@ -85,22 +85,25 @@ const client = new ApolloClient({
 const generateTopTenStaleIssuesText = (staleIssues: any) => {
   const staleIssuesText: string = staleIssues.nodes.reduce(
     (mem: string, val: any) => {
-      const titleWithLink = `*${val.title}*\n${val.url}`;
-      const truncatedBody = `${val.bodyText.substr(0, 140)}...`;
+      const titleWithLink = `[${val.title}](${val.url})`;
+      const truncatedBody = `${val.bodyText.substr(0, 140)}`;
 
-      return `${mem}${titleWithLink}\n${truncatedBody}\n...\n`;
+      return `${mem}${titleWithLink}<br />${truncatedBody}...<br /><br />`;
     },
     ''
   );
 
-  return `*Top Stale Issues*\n${staleIssuesText}`;
+  return `
+### Top Stale Issues
+${staleIssuesText}
+`;
 };
 
 const generateTopTenActiveIssuesText = (activeIssues: any) => {
   const activeIssuesText: string = activeIssues.nodes.reduce(
     (mem: string, val: any) => {
-      const titleWithLink = `*${val.title}*\n${val.url}`;
-      const truncatedBody = `${val.bodyText.substr(0, 140)}...`;
+      const titleWithLink = `[${val.title}](${val.url})`;
+      const truncatedBody = `${val.bodyText.substr(0, 140)}`;
       const updatedAt = `${formatDistance(
         parseISO(val.updatedAt),
         new Date()
@@ -113,12 +116,15 @@ const generateTopTenActiveIssuesText = (activeIssues: any) => {
         : 'no';
       const details = `There are ${totalCommentCount} comments on this issue, and it has ${totalReactionCount} reactions. It was last updated ${updatedAt} ago.`;
 
-      return `${mem}${titleWithLink}\n${details}\n${truncatedBody}\n...\n`;
+      return `${mem}${titleWithLink}<br />${details}<br />${truncatedBody}...<br /><br />`;
     },
     ''
   );
 
-  return `*Top Active Issues*\n${activeIssuesText}`;
+  return `
+### Top Active Issues
+${activeIssuesText}
+`;
 };
 
 const generateAvgTimeToCloseIssuesText = (closedIssues: any) => {
@@ -206,7 +212,7 @@ async function main(): Promise<void> {
      * Avg time between review and merge
      */
 
-    const numberOfOpenIssues: string = `There are ${repository.openIssuesForStats.totalCount} open issues currently`;
+    const numberOfOpenIssues: string = `There are ${repository.openIssuesForStats.totalCount} open issues currently.`;
 
     const avgTimeToCloseIssues: string = generateAvgTimeToCloseIssuesText(
       repository.closedIssuesForStats
@@ -228,20 +234,30 @@ async function main(): Promise<void> {
       repository.topTenActiveIssues
     );
 
-    const title = `*Repo Metrics for \`apollo-tooling\` - ${format(
+    const title = `Repo Metrics for \`apollo-tooling\` - ${format(
       new Date(),
       'MMMM do, yyyy'
     )}`;
 
     const report: string = `
-${title}\n
-${numberOfOpenIssues} ${avgTimeToRespondToIssues} ${avgTimeSinceLastUpdate} ${avgTimeToCloseIssues}\n
-...\n
-${topTenActiveIssues}\n
+## ${title}
+
+- ${numberOfOpenIssues}
+- ${avgTimeToRespondToIssues}
+- ${avgTimeSinceLastUpdate}
+- ${avgTimeToCloseIssues}
+
+${topTenActiveIssues}
+
 ${topTenStaleIssues}
 `;
 
-    console.log(report);
+    if (process.env.ZAPIER_WEBHOOK_URL) {
+      fetch(process.env.ZAPIER_WEBHOOK_URL, {
+        method: 'POST',
+        body: JSON.stringify({ title, report }),
+      });
+    }
   } catch (error) {
     console.log(error);
     process.exit(1);
