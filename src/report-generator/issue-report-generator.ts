@@ -8,8 +8,15 @@ type Issue = {
   createdAt: string;
   updatedAt: string;
   closedAt: string;
-  comments: { totalCount: number; nodes: { createdAt: string }[] };
-  reactions: { totalCount: number };
+  comments: {
+    totalCount: number;
+    nodes: {
+      createdAt: string;
+    }[];
+  };
+  reactions: {
+    totalCount: number;
+  };
 };
 
 type Issues = {
@@ -17,7 +24,7 @@ type Issues = {
   nodes: Issue[];
 };
 
-type Repository = {
+export type RepositoryIssues = {
   name: string;
   closedIssuesForStats: Issues;
   openIssuesForStats: Issues;
@@ -37,7 +44,8 @@ const generateTopTenStaleIssuesText = (staleIssues: Issues) => {
   );
 
   return outdent`
-    ### Top Stale Issues
+    **Top Stale Issues**
+
     ${staleIssuesText}
   `;
 };
@@ -65,7 +73,8 @@ const generateTopTenActiveIssuesText = (activeIssues: Issues) => {
   );
 
   return outdent`
-    ### Top Active Issues
+    **Top Active Issues**
+
     ${activeIssuesText}
   `;
 };
@@ -140,7 +149,7 @@ const generateAvgTimeToRespondToIssuesText = (openIssues: Issues) => {
   } issues out of the last 100 that have not been responded to.`;
 };
 
-const generateIssuesReportForRepository = (repository: Repository): string => {
+export default (repository: RepositoryIssues): string => {
   const numberOfOpenIssues: string = `There are ${repository.openIssuesForStats.totalCount} open issues currently.`;
 
   const avgTimeToCloseIssues: string = generateAvgTimeToCloseIssuesText(
@@ -163,10 +172,8 @@ const generateIssuesReportForRepository = (repository: Repository): string => {
     repository.topTenActiveIssues
   );
 
-  const title = `## ${repository.name}`;
-
   const report: string = outdent`
-    ${title}
+    ### Issues
 
     - ${numberOfOpenIssues}
     - ${avgTimeToRespondToIssues}
@@ -180,5 +187,3 @@ const generateIssuesReportForRepository = (repository: Repository): string => {
 
   return report;
 };
-
-export default generateIssuesReportForRepository;
